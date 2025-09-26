@@ -38,6 +38,7 @@ Both Forge and NeoForge modules support the following commands:
 - `/nation leave` - Leave your current nation (non-leaders only)
 - `/nation disband` - Disband your nation (leaders only)
 - `/nation info` - Display information about your nation
+- `/nation help` - Show all available commands with descriptions
 
 ## Building the Project
 
@@ -127,31 +128,37 @@ There are known compatibility issues between Forge 1.21.1 and Java 21's module s
 
 Once the client starts and you create/join a world:
 
-1. **Create a nation:**
+1. **View available commands:**
+   ```
+   /nation help
+   ```
+   Expected: Formatted list of all commands
+
+2. **Create a nation:**
    ```
    /nation create TestNation
    ```
    Expected: Success message confirming creation
 
-2. **Check nation info:**
+3. **Check nation info:**
    ```
    /nation info
    ```
    Expected: Display nation details (name, leader status, member count, balance)
 
-3. **Test with another player (or in multiplayer):**
+4. **Test with another player (or in multiplayer):**
    ```
    /nation join TestNation
    ```
    Expected: Success message confirming joining
 
-4. **Test disband as leader:**
+5. **Test disband as leader:**
    ```
    /nation disband
    ```
    Expected: Success message confirming disbandment
 
-5. **Test error cases:**
+6. **Test error cases:**
    ```
    /nation create TestNation
    ```

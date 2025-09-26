@@ -27,7 +27,9 @@ public class NationCommands {
                 .then(Commands.literal("disband")
                         .executes(NationCommands::disbandNation))
                 .then(Commands.literal("info")
-                        .executes(NationCommands::nationInfo)));
+                        .executes(NationCommands::nationInfo))
+                .then(Commands.literal("help")
+                        .executes(NationCommands::showHelp)));
     }
     
     private static int createNation(CommandContext<CommandSourceStack> context) {
@@ -137,5 +139,14 @@ public class NationCommands {
             source.sendFailure(Component.literal(result.getMessage()));
             return 0;
         }
+    }
+    
+    private static int showHelp(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        
+        String helpText = NationManager.getHelpText();
+        source.sendSuccess(() -> Component.literal(helpText), false);
+        
+        return 1;
     }
 }

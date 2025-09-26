@@ -160,6 +160,21 @@ public class NationManager {
     }
     
     /**
+     * Get help information for nation commands
+     * @return Help text with all available commands
+     */
+    public static String getHelpText() {
+        return "§6=== Nation Commands ===\n" +
+               "§e/nation create <name>§f - Create a new nation\n" +
+               "§e/nation join <name>§f - Join an existing nation\n" +
+               "§e/nation leave§f - Leave your current nation (non-leaders)\n" +
+               "§e/nation disband§f - Disband your nation (leaders only)\n" +
+               "§e/nation info§f - Show your nation information\n" +
+               "§e/nation help§f - Show this help message\n" +
+               "§7Use tab completion for available nation names";
+    }
+    
+    /**
      * Get the nation a player belongs to
      * @param player The player
      * @return The nation, or null if not a member of any nation
