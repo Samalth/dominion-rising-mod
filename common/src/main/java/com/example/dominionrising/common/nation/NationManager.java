@@ -143,8 +143,9 @@ public class NationManager {
             return NationResult.error("Your nation no longer exists");
         }
         
-        if (!nation.isLeader(player)) {
-            return NationResult.error("Only the nation leader can disband the nation");
+        NationRole playerRole = nation.getMemberRole(player);
+        if (!playerRole.canDisband()) {
+            return NationResult.error("Only nation leaders can disband the nation");
         }
         
         // Remove all members from the nation mapping
@@ -160,6 +161,132 @@ public class NationManager {
     }
     
     /**
+     * Promote a player to a higher role (only leaders can promote)
+     * @param requester The player requesting the promotion
+     * @param targetPlayerName The name of the player to promote
+     * @return Result of the operation
+     */
+    public NationResult promotePlayer(UUID requester, String targetPlayerName) {
+        Nation nation = getPlayerNation(requester);
+        if (nation == null) {
+            return NationResult.error("You are not a member of any nation");
+        }
+        
+        if (!nation.hasRoleOrHigher(requester, NationRole.LEADER)) {
+            return NationResult.error("Only leaders can promote members");
+        }
+        
+        // For now, we'll use a simple approach - in a real implementation you'd resolve player names to UUIDs
+        // This is a placeholder for demonstration
+        return NationResult.error("Player name resolution not implemented yet - use UUID-based promotion");
+    }
+    
+    /**
+     * Promote a player by UUID
+     */
+    public NationResult promotePlayer(UUID requester, UUID targetPlayer) {
+        Nation nation = getPlayerNation(requester);
+        if (nation == null) {
+            return NationResult.error("You are not a member of any nation");
+        }
+        
+        if (!nation.hasRoleOrHigher(requester, NationRole.LEADER)) {
+            return NationResult.error("Only leaders can promote members");
+        }
+        
+        if (!nation.isMember(targetPlayer)) {
+            return NationResult.error("Target player is not a member of your nation");
+        }
+        
+        if (targetPlayer.equals(requester)) {
+            return NationResult.error("You cannot promote yourself");
+        }
+        
+        NationRole currentRole = nation.getMemberRole(targetPlayer);
+        
+        switch (currentRole) {
+            case COMMANDER:
+                return NationResult.error("Player is already at maximum promotable rank (Commander)");
+            case LEADER:
+                return NationResult.error("Cannot promote another leader");
+            case CITIZEN:
+                nation.setMemberRole(targetPlayer, NationRole.COMMANDER);
+                return NationResult.success("Player promoted from " + currentRole.getDisplayName() + " to Commander");
+            default:
+                return NationResult.error("Invalid role");
+        }
+    }
+    
+    /**
+     * Demote a player to a lower role (only leaders can demote)
+     */
+    public NationResult demotePlayer(UUID requester, UUID targetPlayer) {
+        Nation nation = getPlayerNation(requester);
+        if (nation == null) {
+            return NationResult.error("You are not a member of any nation");
+        }
+        
+        if (!nation.hasRoleOrHigher(requester, NationRole.LEADER)) {
+            return NationResult.error("Only leaders can demote members");
+        }
+        
+        if (!nation.isMember(targetPlayer)) {
+            return NationResult.error("Target player is not a member of your nation");
+        }
+        
+        if (targetPlayer.equals(requester)) {
+            return NationResult.error("You cannot demote yourself");
+        }
+        
+        NationRole currentRole = nation.getMemberRole(targetPlayer);
+        
+        switch (currentRole) {
+            case CITIZEN:
+                return NationResult.error("Player is already at minimum rank (Citizen)");
+            case LEADER:
+                return NationResult.error("Cannot demote another leader");
+            case COMMANDER:
+                nation.setMemberRole(targetPlayer, NationRole.CITIZEN);
+                return NationResult.success("Player demoted from " + currentRole.getDisplayName() + " to Citizen");
+            default:
+                return NationResult.error("Invalid role");
+        }
+    }
+    
+    /**
+     * Kick a player from the nation (only leaders can kick)
+     */
+    public NationResult kickPlayer(UUID requester, UUID targetPlayer) {
+        Nation nation = getPlayerNation(requester);
+        if (nation == null) {
+            return NationResult.error("You are not a member of any nation");
+        }
+        
+        if (!nation.hasRoleOrHigher(requester, NationRole.LEADER)) {
+            return NationResult.error("Only leaders can kick members");
+        }
+        
+        if (!nation.isMember(targetPlayer)) {
+            return NationResult.error("Target player is not a member of your nation");
+        }
+        
+        if (targetPlayer.equals(requester)) {
+            return NationResult.error("You cannot kick yourself - use disband instead");
+        }
+        
+        if (nation.isLeader(targetPlayer)) {
+            return NationResult.error("Cannot kick another leader");
+        }
+        
+        if (nation.removeMember(targetPlayer)) {
+            playerToNation.remove(targetPlayer);
+            return NationResult.success("Player has been kicked from the nation");
+        } else {
+            return NationResult.error("Failed to kick player");
+        }
+    }
+    
+    /**
      * Get help information for nation commands
      * @return Help text with all available commands
      */
@@ -170,8 +297,11 @@ public class NationManager {
                "§e/nation leave§f - Leave your current nation (non-leaders)\n" +
                "§e/nation disband§f - Disband your nation (leaders only)\n" +
                "§e/nation info§f - Show your nation information\n" +
+               "§e/nation promote <player>§f - Promote a member (leaders only)\n" +
+               "§e/nation demote <player>§f - Demote a member (leaders only)\n" +
+               "§e/nation kick <player>§f - Kick a member (leaders only)\n" +
                "§e/nation help§f - Show this help message\n" +
-               "§7Use tab completion for available nation names";
+               "§7Roles: Leader > Commander > Citizen";
     }
     
     /**
@@ -220,6 +350,23 @@ public class NationManager {
      */
     public int getNationCount() {
         return nations.size();
+    }
+    
+    /**
+     * Load nation data (for persistence)
+     */
+    public void loadData(Map<String, Nation> loadedNations, Map<UUID, String> loadedPlayerToNation) {
+        nations.clear();
+        playerToNation.clear();
+        nations.putAll(loadedNations);
+        playerToNation.putAll(loadedPlayerToNation);
+    }
+    
+    /**
+     * Get the player to nation mapping (for persistence)
+     */
+    public Map<UUID, String> getPlayerToNationMap() {
+        return new HashMap<>(playerToNation);
     }
     
     /**

@@ -28,6 +28,15 @@ public class NationCommands {
                         .executes(NationCommands::disbandNation))
                 .then(Commands.literal("info")
                         .executes(NationCommands::nationInfo))
+                .then(Commands.literal("promote")
+                        .then(Commands.argument("player", StringArgumentType.word())
+                                .executes(NationCommands::promotePlayer)))
+                .then(Commands.literal("demote")
+                        .then(Commands.argument("player", StringArgumentType.word())
+                                .executes(NationCommands::demotePlayer)))
+                .then(Commands.literal("kick")
+                        .then(Commands.argument("player", StringArgumentType.word())
+                                .executes(NationCommands::kickPlayer)))
                 .then(Commands.literal("help")
                         .executes(NationCommands::showHelp)));
     }
@@ -148,5 +157,95 @@ public class NationCommands {
         source.sendSuccess(() -> Component.literal(helpText), false);
         
         return 1;
+    }
+    
+    private static int promotePlayer(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        
+        if (!(source.getEntity() instanceof ServerPlayer player)) {
+            source.sendFailure(Component.literal("This command can only be used by players"));
+            return 0;
+        }
+        
+        String targetPlayerName = StringArgumentType.getString(context, "player");
+        
+        // For now, we'll find the player by name in the current world
+        // In a production implementation, you might want to store player name mappings
+        ServerPlayer targetPlayer = source.getServer().getPlayerList().getPlayerByName(targetPlayerName);
+        if (targetPlayer == null) {
+            source.sendFailure(Component.literal("Player '" + targetPlayerName + "' not found"));
+            return 0;
+        }
+        
+        NationManager manager = NationManager.getInstance();
+        NationManager.NationResult result = manager.promotePlayer(player.getUUID(), targetPlayer.getUUID());
+        
+        if (result.isSuccess()) {
+            source.sendSuccess(() -> Component.literal(result.getMessage()), false);
+            // Notify the target player
+            targetPlayer.sendSystemMessage(Component.literal("You have been promoted in your nation!"));
+            return 1;
+        } else {
+            source.sendFailure(Component.literal(result.getMessage()));
+            return 0;
+        }
+    }
+    
+    private static int demotePlayer(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        
+        if (!(source.getEntity() instanceof ServerPlayer player)) {
+            source.sendFailure(Component.literal("This command can only be used by players"));
+            return 0;
+        }
+        
+        String targetPlayerName = StringArgumentType.getString(context, "player");
+        ServerPlayer targetPlayer = source.getServer().getPlayerList().getPlayerByName(targetPlayerName);
+        if (targetPlayer == null) {
+            source.sendFailure(Component.literal("Player '" + targetPlayerName + "' not found"));
+            return 0;
+        }
+        
+        NationManager manager = NationManager.getInstance();
+        NationManager.NationResult result = manager.demotePlayer(player.getUUID(), targetPlayer.getUUID());
+        
+        if (result.isSuccess()) {
+            source.sendSuccess(() -> Component.literal(result.getMessage()), false);
+            // Notify the target player
+            targetPlayer.sendSystemMessage(Component.literal("You have been demoted in your nation."));
+            return 1;
+        } else {
+            source.sendFailure(Component.literal(result.getMessage()));
+            return 0;
+        }
+    }
+    
+    private static int kickPlayer(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        
+        if (!(source.getEntity() instanceof ServerPlayer player)) {
+            source.sendFailure(Component.literal("This command can only be used by players"));
+            return 0;
+        }
+        
+        String targetPlayerName = StringArgumentType.getString(context, "player");
+        ServerPlayer targetPlayer = source.getServer().getPlayerList().getPlayerByName(targetPlayerName);
+        if (targetPlayer == null) {
+            source.sendFailure(Component.literal("Player '" + targetPlayerName + "' not found"));
+            return 0;
+        }
+        
+        NationManager manager = NationManager.getInstance();
+        NationManager.NationResult result = manager.kickPlayer(player.getUUID(), targetPlayer.getUUID());
+        
+        if (result.isSuccess()) {
+            source.sendSuccess(() -> Component.literal(result.getMessage()), false);
+            // Notify the target player
+            targetPlayer.sendSystemMessage(Component.literal("You have been kicked from your nation."));
+            return 1;
+        } else {
+            source.sendFailure(Component.literal(result.getMessage()));
+            return 0;
+        }
     }
 }

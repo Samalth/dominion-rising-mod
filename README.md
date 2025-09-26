@@ -10,10 +10,12 @@ Dominion Rising introduces a comprehensive nation management system to Minecraft
 
 - **Nation Creation**: Establish your own nation with a unique name
 - **Member Management**: Invite players to join your nation and build a community
-- **Leadership System**: Leaders have special permissions and responsibilities
+- **Role-Based Permissions**: Three-tier hierarchy (Leader > Commander > Citizen) with distinct privileges
+- **World Persistence**: Nation data automatically saves and loads with your world
+- **Role Management**: Promote, demote, and kick members based on your permissions
 - **Multi-Loader Support**: Available for both Forge and NeoForge
 - **Thread-Safe**: Robust implementation that works reliably on multiplayer servers
-- **In-Memory Storage**: Fast, efficient data management (persistence coming in future updates)
+- **Custom Serialization**: Efficient world data storage without external dependencies
 
 ## 📋 Requirements
 
@@ -96,6 +98,42 @@ Display information about your current nation.
 /nation info
 ```
 
+### Role Management Commands
+
+#### `/nation promote <player>`
+Promote a member to a higher role within your nation.
+- **Who can use**: Leaders and Commanders (with restrictions)
+- **Requirements**: Must have permission to promote the target player
+- **Role Hierarchy**: Leader > Commander > Citizen
+- **Result**: Target player gains additional permissions
+
+**Example:**
+```
+/nation promote Steve
+```
+
+#### `/nation demote <player>`
+Demote a member to a lower role within your nation.
+- **Who can use**: Leaders and Commanders (with restrictions)
+- **Requirements**: Must have permission to demote the target player
+- **Result**: Target player loses some permissions
+
+**Example:**
+```
+/nation demote Alex
+```
+
+#### `/nation kick <player>`
+Remove a member from your nation.
+- **Who can use**: Leaders and Commanders (with restrictions)
+- **Requirements**: Must have permission to kick the target player
+- **Result**: Target player is removed from the nation
+
+**Example:**
+```
+/nation kick BadPlayer
+```
+
 ## 📊 Examples & Workflows
 
 ### Starting Your Nation
@@ -128,6 +166,37 @@ Display information about your current nation.
 /nation disband
 ```
 
+## 👑 Role System
+
+Dominion Rising features a hierarchical role system that determines what actions players can perform within their nation.
+
+### Role Hierarchy
+1. **Leader** (👑) - The nation founder with full permissions
+2. **Commander** (⚔️) - High-ranking members with management rights
+3. **Citizen** (👤) - Regular nation members
+
+### Role Permissions
+
+| Action | Leader | Commander | Citizen |
+|--------|---------|-----------|---------|
+| Create Nation | ✅ | ❌ | ❌ |
+| Disband Nation | ✅ | ❌ | ❌ |
+| Promote to Commander | ✅ | ❌ | ❌ |
+| Promote to Citizen | ✅ | ✅ | ❌ |
+| Demote Commander | ✅ | ❌ | ❌ |
+| Demote Citizen | ✅ | ✅ | ❌ |
+| Kick Commander | ✅ | ❌ | ❌ |
+| Kick Citizen | ✅ | ✅ | ❌ |
+| Join Nation | ✅ | ✅ | ✅ |
+| Leave Nation | ❌ | ✅ | ✅ |
+| View Nation Info | ✅ | ✅ | ✅ |
+
+### Role Rules
+- **Only one Leader** per nation (the founder)
+- **Leaders cannot leave** - they must transfer leadership or disband
+- **Higher roles can manage lower roles** but not equals or superiors
+- **Roles persist** across server restarts with the world save data
+
 ## ⚠️ Important Notes
 
 ### Leadership Rules
@@ -141,10 +210,16 @@ Display information about your current nation.
 - Spaces and special characters are allowed
 
 ### Current Limitations
-- **No persistence**: Nations are stored in memory and reset on server restart
 - **No economy integration**: Balance tracking is implemented but not connected to economy systems
 - **No GUI**: All interactions are command-based
 - **No warfare system**: Combat mechanics not yet implemented
+
+### Future Features
+- **Advanced Economy**: Integration with economy mods and custom currency systems
+- **Territory Control**: Claim and manage land for your nation
+- **Diplomacy System**: Form alliances, trade agreements, and declare wars
+- **Army Management**: Recruit and manage military units
+- **GUI Interface**: User-friendly graphical interface for nation management
 
 ## 🔧 For Server Administrators
 
