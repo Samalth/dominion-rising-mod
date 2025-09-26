@@ -23,6 +23,10 @@ minecraft {
             workingDirectory project.file('run')
             property 'forge.logging.markers', 'REGISTRIES'
             property 'forge.logging.console.level', 'debug'
+            
+            // JVM arguments to fix module issues with Java 21
+            jvmArgs '-XX:+IgnoreUnrecognizedVMOptions', '--add-modules=ALL-SYSTEM', '--add-opens=java.base/java.util.jar=ALL-UNNAMED', '--add-opens=java.base/java.lang.invoke=ALL-UNNAMED', '--add-exports=java.base/sun.security.util=ALL-UNNAMED', '--add-exports=jdk.naming.dns/com.sun.jndi.dns=ALL-UNNAMED,java.naming', '--add-opens=java.base/java.nio=ALL-UNNAMED', '--add-opens=java.logging/java.util.logging=ALL-UNNAMED'
+            
             mods {
                 dominionrising {
                     source sourceSets.main
@@ -35,6 +39,10 @@ minecraft {
             workingDirectory project.file('run')
             property 'forge.logging.markers', 'REGISTRIES'
             property 'forge.logging.console.level', 'debug'
+            
+            // JVM arguments to fix module issues with Java 21
+            jvmArgs '-XX:+IgnoreUnrecognizedVMOptions', '--add-modules=ALL-SYSTEM', '--add-opens=java.base/java.util.jar=ALL-UNNAMED', '--add-opens=java.base/java.lang.invoke=ALL-UNNAMED', '--add-exports=java.base/sun.security.util=ALL-UNNAMED', '--add-exports=jdk.naming.dns/com.sun.jndi.dns=ALL-UNNAMED,java.naming', '--add-opens=java.base/java.nio=ALL-UNNAMED', '--add-opens=java.logging/java.util.logging=ALL-UNNAMED'
+            
             mods {
                 dominionrising {
                     source sourceSets.main

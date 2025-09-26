@@ -13,19 +13,47 @@ java {
 }
 
 // NeoForge configuration
-minecraft {
-    version = '1.21.1'
-    
-    runs {
-        client {
-            systemProperty 'neoforge.logging.markers', 'REGISTRIES'
-            systemProperty 'neoforge.logging.console.level', 'debug'
-        }
+runs {
+    client {
+        systemProperty 'neoforge.logging.markers', 'REGISTRIES'
+        systemProperty 'neoforge.logging.console.level', 'debug'
         
-        server {
-            systemProperty 'neoforge.logging.markers', 'REGISTRIES'
-            systemProperty 'neoforge.logging.console.level', 'debug'
-        }
+        // JVM arguments to disable module system and fix conflicts with Java 21
+        jvmArguments = [
+            '-XX:+IgnoreUnrecognizedVMOptions',
+            '--illegal-access=permit',
+            '--add-opens=java.base/java.lang=ALL-UNNAMED',
+            '--add-opens=java.base/java.util=ALL-UNNAMED',
+            '--add-opens=java.base/java.io=ALL-UNNAMED',
+            '--add-opens=java.base/java.nio=ALL-UNNAMED',
+            '--add-opens=java.base/sun.nio.ch=ALL-UNNAMED',
+            '--add-opens=java.base/java.net=ALL-UNNAMED',
+            '--add-opens=java.base/java.util.concurrent=ALL-UNNAMED',
+            '--add-opens=java.base/sun.util.locale=ALL-UNNAMED',
+            '--add-opens=java.base/sun.util.locale.provider=ALL-UNNAMED',
+            '--add-opens=java.logging/java.util.logging=ALL-UNNAMED'
+        ]
+    }
+    
+    server {
+        systemProperty 'neoforge.logging.markers', 'REGISTRIES'
+        systemProperty 'neoforge.logging.console.level', 'debug'
+        
+        // JVM arguments to disable module system and fix conflicts with Java 21
+        jvmArguments = [
+            '-XX:+IgnoreUnrecognizedVMOptions',
+            '--illegal-access=permit',
+            '--add-opens=java.base/java.lang=ALL-UNNAMED',
+            '--add-opens=java.base/java.util=ALL-UNNAMED',
+            '--add-opens=java.base/java.io=ALL-UNNAMED',
+            '--add-opens=java.base/java.nio=ALL-UNNAMED',
+            '--add-opens=java.base/sun.nio.ch=ALL-UNNAMED',
+            '--add-opens=java.base/java.net=ALL-UNNAMED',
+            '--add-opens=java.base/java.util.concurrent=ALL-UNNAMED',
+            '--add-opens=java.base/sun.util.locale=ALL-UNNAMED',
+            '--add-opens=java.base/sun.util.locale.provider=ALL-UNNAMED',
+            '--add-opens=java.logging/java.util.logging=ALL-UNNAMED'
+        ]
     }
 }
 

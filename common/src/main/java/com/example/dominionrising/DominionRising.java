@@ -1,5 +1,7 @@
 package com.example.dominionrising;
 
+import com.example.dominionrising.common.nation.NationManager;
+
 /**
  * Main class for Dominion Rising mod
  * Contains shared constants and common logic
@@ -16,7 +18,9 @@ public class DominionRising {
      * Called by loader-specific entry points
      */
     public static void init() {
-        // Common initialization logic will go here
+        // Initialize nation manager
+        NationManager.getInstance();
+        
         System.out.println("Dominion Rising mod initialized!");
     }
 }
