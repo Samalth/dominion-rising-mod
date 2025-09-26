@@ -1,0 +1,27 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="MIT"
+
+[[mods]]
+modId="dominionrising"
+version="1.0.0"
+displayName="Dominion Rising"
+description="A Minecraft mod for expanding your empire"
+logoFile="logo.png"
+credits="Created with love"
+authors="Samalth"
+displayURL="https://github.com/Samalth/dominion-rising-mod"
+
+[[dependencies.dominionrising]]
+modId="forge"
+mandatory=true
+versionRange="[52.0.17,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.dominionrising]]
+modId="minecraft"  
+mandatory=true
+versionRange="[1.21.1]"
+ordering="NONE"
+side="BOTH"

@@ -1,0 +1,21 @@
+// Dominion Rising - Multi-loader Minecraft Mod
+// Root build configuration
+
+plugins {
+    id 'java'
+    id 'maven-publish'
+}
+
+// Configure Java toolchain for Java 21
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+// Apply common configuration to all projects
+allprojects {
+    repositories {
+        mavenCentral()
+    }
+}

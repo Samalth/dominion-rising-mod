@@ -1,0 +1,50 @@
+// NeoForge module - NeoForge specific implementation
+
+plugins {
+    id 'java'
+    id 'net.neoforged.gradle.userdev' version '7.0.145'
+}
+
+// Configure Java toolchain for Java 21
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+// NeoForge configuration
+minecraft {
+    version = '1.21.1'
+    
+    runs {
+        client {
+            systemProperty 'neoforge.logging.markers', 'REGISTRIES'
+            systemProperty 'neoforge.logging.console.level', 'debug'
+        }
+        
+        server {
+            systemProperty 'neoforge.logging.markers', 'REGISTRIES'
+            systemProperty 'neoforge.logging.console.level', 'debug'
+        }
+    }
+}
+
+repositories {
+    maven {
+        name = 'NeoForged'
+        url = 'https://maven.neoforged.net/releases'
+    }
+}
+
+dependencies {
+    implementation "net.neoforged:neoforge:21.1.57"
+    
+    // Common module dependency  
+    implementation project(':common')
+}
+
+// Include common sources in jar
+jar {
+    from project(':common').sourceSets.main.output
+}
+// Dependencies on common module will be configured here

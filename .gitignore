@@ -1,0 +1,45 @@
+# Gradle files
+.gradle/
+build/
+**/build/
+
+# Gradle wrapper
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# IDE files
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+.vscode/
+*.code-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Java files
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
+
+# Logs
+*.log
+
+# Runtime
+run/
+logs/
+
+# Minecraft development
+.mixin.out/
+.cache/
+
+# Other
+tmp/
+temp/

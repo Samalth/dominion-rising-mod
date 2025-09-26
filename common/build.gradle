@@ -1,0 +1,15 @@
+// Common module - Shared code between loaders
+// This module contains platform-agnostic mod logic
+
+plugins {
+    id 'java'
+}
+
+// Configure Java toolchain for Java 21
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+// Common dependencies will be added here later

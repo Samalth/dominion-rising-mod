@@ -1,0 +1,23 @@
+// Dominion Rising - Multi-loader Minecraft Mod
+// Root project settings
+
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        maven {
+            name = 'MinecraftForge'
+            url = 'https://maven.minecraftforge.net/'
+        }
+        maven {
+            name = 'NeoForged'
+            url = 'https://maven.neoforged.net/releases'
+        }
+    }
+}
+
+rootProject.name = 'dominion-rising-mod'
+
+// Include subprojects for multi-loader support
+include('common')
+include('forge')
+include('neoforge')
