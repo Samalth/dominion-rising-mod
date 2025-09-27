@@ -240,4 +240,160 @@ public class UnitManager {
         
         return stats;
     }
+
+    // === TACTICAL COMMAND METHODS ===
+
+    /**
+     * Command a unit to attack a target
+     * @param unitId Unit ID
+     * @param targetId Target entity ID
+     * @return true if command was successful
+     */
+    public boolean commandAttack(UUID unitId, UUID targetId) {
+        NationUnit unit = units.get(unitId);
+        if (unit != null && unit.isAlive() && targetId != null) {
+            unit.setAttackTarget(targetId);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Command a unit to defend a position
+     * @param unitId Unit ID
+     * @param x X coordinate
+     * @param y Y coordinate
+     * @param z Z coordinate
+     * @return true if command was successful
+     */
+    public boolean commandDefend(UUID unitId, double x, double y, double z) {
+        NationUnit unit = units.get(unitId);
+        if (unit != null && unit.isAlive()) {
+            unit.setDefendPosition(x, y, z);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Get units within command range of a player
+     * @param playerNation Player's nation
+     * @param playerX Player X coordinate
+     * @param playerY Player Y coordinate  
+     * @param playerZ Player Z coordinate
+     * @param maxDistance Maximum command distance
+     * @return List of units within range
+     */
+    public List<NationUnit> getUnitsInRange(String playerNation, double playerX, double playerY, double playerZ, double maxDistance) {
+        return listUnits(playerNation).stream()
+                .filter(unit -> {
+                    if (unit.isDefending()) {
+                        double dx = unit.getDefendX() - playerX;
+                        double dy = unit.getDefendY() - playerY;
+                        double dz = unit.getDefendZ() - playerZ;
+                        return Math.sqrt(dx*dx + dy*dy + dz*dz) <= maxDistance;
+                    }
+                    // For non-defending units, assume they're near the player for now
+                    return true;
+                })
+                .collect(Collectors.toList());
+    }
+
+    // === PERSISTENCE METHODS ===
+
+    /**
+     * Serialize all units to string for world persistence
+     * @return Serialized unit data
+     */
+    public String serializeUnits() {
+        StringBuilder sb = new StringBuilder();
+        for (NationUnit unit : units.values()) {
+            if (unit.isAlive()) {
+                sb.append(unit.serialize()).append("\n");
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Load units from serialized data
+     * @param data Serialized unit data
+     */
+    public void loadUnits(String data) {
+        if (data == null || data.trim().isEmpty()) {
+            return;
+        }
+
+        // Clear existing data
+        units.clear();
+        nationUnits.clear();
+
+        String[] lines = data.split("\n");
+        int loaded = 0;
+        
+        for (String line : lines) {
+            if (line.trim().isEmpty()) continue;
+            
+            NationUnit unit = NationUnit.deserialize(line.trim());
+            if (unit != null) {
+                // Register unit
+                units.put(unit.getId(), unit);
+                
+                // Add to nation's unit set
+                String nationName = unit.getOwnerNation().toLowerCase();
+                nationUnits.computeIfAbsent(nationName, k -> ConcurrentHashMap.newKeySet()).add(unit.getId());
+                
+                loaded++;
+            }
+        }
+        
+        System.out.println("UnitManager: Loaded " + loaded + " units from persistence data");
+    }
+
+    /**
+     * Add a pre-existing unit (for loading from persistence)
+     * @param unit The unit to add
+     * @return true if added successfully
+     */
+    public boolean addExistingUnit(NationUnit unit) {
+        if (unit == null || units.containsKey(unit.getId())) {
+            return false;
+        }
+        
+        // Register unit
+        units.put(unit.getId(), unit);
+        
+        // Add to nation's unit set
+        String nationName = unit.getOwnerNation().toLowerCase();
+        nationUnits.computeIfAbsent(nationName, k -> ConcurrentHashMap.newKeySet()).add(unit.getId());
+        
+        return true;
+    }
+
+    /**
+     * Get unit data for world persistence integration
+     * @return Map of unit persistence data
+     */
+    public Map<String, Object> getPersistenceData() {
+        Map<String, Object> data = new HashMap<>();
+        data.put("units", serializeUnits());
+        data.put("totalUnits", getTotalUnitCount());
+        data.put("lastSaveTime", System.currentTimeMillis());
+        return data;
+    }
+
+    /**
+     * Load unit data from world persistence
+     * @param data Persistence data map
+     */
+    public void loadFromPersistenceData(Map<String, Object> data) {
+        if (data.containsKey("units")) {
+            String unitData = (String) data.get("units");
+            loadUnits(unitData);
+        }
+        
+        if (data.containsKey("lastSaveTime")) {
+            System.out.println("UnitManager: Restored from save at " + data.get("lastSaveTime"));
+        }
+    }
 }

@@ -2,6 +2,7 @@ package com.example.dominionrising.neoforge.data;
 
 import com.example.dominionrising.common.nation.NationDataSerializer;
 import com.example.dominionrising.common.nation.NationManager;
+import com.example.dominionrising.common.unit.UnitManager;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -11,20 +12,22 @@ import net.minecraft.world.level.storage.DimensionDataStorage;
 import javax.annotation.Nonnull;
 
 /**
- * NeoForge implementation for persisting nation data using SavedData
+ * NeoForge implementation for persisting nation and unit data using SavedData
  */
 public class NationSavedData extends SavedData {
     private static final String DATA_NAME = "dominion_rising_nations";
     
     private String nationData = "";
+    private String unitData = "";
     
     public NationSavedData() {
         super();
     }
     
-    public NationSavedData(String nationData) {
+    public NationSavedData(String nationData, String unitData) {
         this();
         this.nationData = nationData;
+        this.unitData = unitData;
     }
     
     /**
@@ -43,27 +46,30 @@ public class NationSavedData extends SavedData {
     }
     
     /**
-     * Load nation data from NBT
+     * Load nation and unit data from NBT
      */
     public static NationSavedData load(CompoundTag nbt, HolderLookup.Provider provider) {
-        String data = nbt.getString("nationData");
-        return new NationSavedData(data);
+        String nationData = nbt.getString("nationData");
+        String unitData = nbt.getString("unitData");
+        return new NationSavedData(nationData, unitData);
     }
     
     /**
-     * Save nation data to NBT
+     * Save nation and unit data to NBT
      */
     @Override
     @Nonnull
     public CompoundTag save(CompoundTag nbt, HolderLookup.Provider provider) {
         nbt.putString("nationData", nationData);
+        nbt.putString("unitData", unitData);
         return nbt;
     }
     
     /**
-     * Load nation data into the NationManager
+     * Load nation and unit data into the managers
      */
     public void loadIntoManager() {
+        // Load nation data
         if (!nationData.isEmpty()) {
             try {
                 NationDataSerializer.NationData data = NationDataSerializer.deserializeNations(nationData);
@@ -74,21 +80,38 @@ public class NationSavedData extends SavedData {
                 e.printStackTrace();
             }
         }
+        
+        // Load unit data
+        if (!unitData.isEmpty()) {
+            try {
+                UnitManager unitManager = UnitManager.getInstance();
+                unitManager.loadUnits(unitData);
+            } catch (Exception e) {
+                System.err.println("Failed to load unit data: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
     }
     
     /**
-     * Save nation data from the NationManager
+     * Save nation and unit data from the managers
      */
     public void saveFromManager() {
         try {
+            // Save nation data
             NationManager manager = NationManager.getInstance();
             this.nationData = NationDataSerializer.serializeNations(
                 manager.getAllNations(),
                 manager.getPlayerToNationMap()
             );
+            
+            // Save unit data
+            UnitManager unitManager = UnitManager.getInstance();
+            this.unitData = unitManager.serializeUnits();
+            
             setDirty();
         } catch (Exception e) {
-            System.err.println("Failed to save nation data: " + e.getMessage());
+            System.err.println("Failed to save nation and unit data: " + e.getMessage());
             e.printStackTrace();
         }
     }

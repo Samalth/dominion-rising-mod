@@ -2,6 +2,7 @@ package com.example.dominionrising.neoforge;
 
 import com.example.dominionrising.DominionRising;
 import com.example.dominionrising.neoforge.commands.NationCommands;
+import com.example.dominionrising.neoforge.commands.UnitCommands;
 import com.example.dominionrising.neoforge.registry.ModEntities;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -30,5 +31,6 @@ public class DominionRisingNeoForge {
     @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {
         NationCommands.register(event.getDispatcher());
+        UnitCommands.register(event.getDispatcher());
     }
 }

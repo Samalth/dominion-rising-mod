@@ -3,6 +3,7 @@ package com.example.dominionrising.forge.entity;
 import com.example.dominionrising.common.nation.Nation;
 import com.example.dominionrising.common.nation.NationManager;
 import com.example.dominionrising.common.unit.NationUnit;
+import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -18,8 +19,10 @@ import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 
 import javax.annotation.Nullable;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -50,13 +53,17 @@ public class UnitEntity extends PathfinderMob {
     protected void registerGoals() {
         this.goalSelector.addGoal(1, new FloatGoal(this));
         this.goalSelector.addGoal(2, new MeleeAttackGoal(this, 1.0D, false));
-        this.goalSelector.addGoal(3, new FollowOwnerNationPlayersGoal(this, 1.0D, 10.0F, 3.0F));
-        this.goalSelector.addGoal(4, new WaterAvoidingRandomStrollGoal(this, 0.8D));
-        this.goalSelector.addGoal(5, new LookAtPlayerGoal(this, Player.class, 8.0F));
-        this.goalSelector.addGoal(6, new RandomLookAroundGoal(this));
+        this.goalSelector.addGoal(3, new UnitAttackGoal(this, 1.0D, false));
+        this.goalSelector.addGoal(7, new UnitDefendGoal(this, 1.0D));
+        this.goalSelector.addGoal(8, new FollowOwnerNationPlayersGoal(this, 1.0D, 10.0F, 3.0F));
+        this.goalSelector.addGoal(9, new WaterAvoidingRandomStrollGoal(this, 0.8D));
+        this.goalSelector.addGoal(10, new LookAtPlayerGoal(this, Player.class, 8.0F));
+        this.goalSelector.addGoal(11, new RandomLookAroundGoal(this));
 
         this.targetSelector.addGoal(1, new HurtByTargetGoal(this));
-        this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Monster.class, true));
+        this.targetSelector.addGoal(2, new UnitTargetGoal(this));
+        this.targetSelector.addGoal(3, new DefendTargetGoal(this));
+        this.targetSelector.addGoal(4, new NearestAttackableTargetGoal<>(this, Monster.class, true));
     }
 
     public static AttributeSupplier.Builder createAttributes() {
@@ -180,6 +187,247 @@ public class UnitEntity extends PathfinderMob {
     }
 
     /**
+     * Custom AI goal to attack specific targets based on unit tactical state
+     */
+    private static class UnitAttackGoal extends MeleeAttackGoal {
+        private final UnitEntity unit;
+
+        public UnitAttackGoal(UnitEntity unit, double speedModifier, boolean followingTargetEvenIfNotSeen) {
+            super(unit, speedModifier, followingTargetEvenIfNotSeen);
+            this.unit = unit;
+        }
+
+        @Override
+        public boolean canUse() {
+            // Only attack if unit has attack target and is in ATTACKING state
+            if (unit.unitData == null) return false;
+            if (unit.unitData.getCurrentState() != NationUnit.UnitState.ATTACKING) return false;
+            
+            UUID targetId = unit.unitData.getAttackTarget();
+            if (targetId == null) return false;
+            
+            // Find target entity by UUID
+            LivingEntity target = findEntityByUUID(targetId);
+            if (target != null && target.isAlive()) {
+                unit.setTarget(target);
+                return super.canUse();
+            }
+            
+            return false;
+        }
+
+        private LivingEntity findEntityByUUID(UUID targetId) {
+            // Use server level entity iteration
+            if (unit.level().isClientSide) return null;
+            
+            for (Entity entity : unit.level().getEntitiesOfClass(LivingEntity.class, 
+                    unit.getBoundingBox().inflate(32.0D))) {
+                if (entity.getUUID().equals(targetId)) {
+                    return (LivingEntity) entity;
+                }
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Custom AI goal to defend specific positions based on unit tactical state
+     */
+    private static class UnitDefendGoal extends Goal {
+        private final UnitEntity unit;
+        private final double speedModifier;
+        private BlockPos defendPosition;
+
+        public UnitDefendGoal(UnitEntity unit, double speedModifier) {
+            this.unit = unit;
+            this.speedModifier = speedModifier;
+        }
+
+        @Override
+        public boolean canUse() {
+            if (unit.unitData == null) return false;
+            if (unit.unitData.getCurrentState() != NationUnit.UnitState.DEFENDING) return false;
+            
+            // Only try to return to defend position if we're far away AND not currently attacking
+            if (unit.getTarget() != null) return false; // Don't interrupt attacks
+            
+            // Create Vec3 from individual coordinates
+            Vec3 defendPos = new Vec3(unit.unitData.getDefendX(), unit.unitData.getDefendY(), unit.unitData.getDefendZ());
+            if (defendPos.x != 0 || defendPos.y != 0 || defendPos.z != 0) {
+                this.defendPosition = BlockPos.containing(defendPos);
+                return unit.distanceToSqr(defendPos) > 16.0D; // Only move if far from position
+            }
+            return false;
+        }
+
+        @Override
+        public boolean canContinueToUse() {
+            // Stop if we have a target to attack or if we're close enough
+            if (unit.getTarget() != null) return false;
+            
+            return defendPosition != null && 
+                   unit.unitData != null && 
+                   unit.unitData.getCurrentState() == NationUnit.UnitState.DEFENDING &&
+                   unit.distanceToSqr(Vec3.atCenterOf(defendPosition)) > 4.0D;
+        }
+
+        @Override
+        public void start() {
+            if (defendPosition != null) {
+                unit.getNavigation().moveTo(defendPosition.getX(), defendPosition.getY(), defendPosition.getZ(), speedModifier);
+            }
+        }
+
+        @Override
+        public void stop() {
+            unit.getNavigation().stop();
+        }
+
+        @Override
+        public void tick() {
+            // Only keep moving to position if we don't have a target and we're still far away
+            if (unit.getTarget() == null && defendPosition != null && 
+                unit.distanceToSqr(Vec3.atCenterOf(defendPosition)) > 4.0D) {
+                unit.getNavigation().moveTo(defendPosition.getX(), defendPosition.getY(), defendPosition.getZ(), speedModifier);
+            }
+        }
+    }
+
+    /**
+     * Custom target selector for unit tactical behavior
+     */
+    private static class UnitTargetGoal extends Goal {
+        private final UnitEntity unit;
+
+        public UnitTargetGoal(UnitEntity unit) {
+            this.unit = unit;
+        }
+
+        @Override
+        public boolean canUse() {
+            if (unit.unitData == null) return false;
+            if (unit.unitData.getCurrentState() != NationUnit.UnitState.ATTACKING) return false;
+            
+            UUID targetId = unit.unitData.getAttackTarget();
+            if (targetId == null) return false;
+            
+            // Find and set target
+            LivingEntity target = findEntityByUUID(targetId);
+            if (target != null && target.isAlive()) {
+                unit.setTarget(target);
+                return true;
+            }
+            
+            return false;
+        }
+
+        @Override
+        public boolean canContinueToUse() {
+            return unit.getTarget() != null && 
+                   unit.getTarget().isAlive() && 
+                   unit.unitData != null && 
+                   unit.unitData.getCurrentState() == NationUnit.UnitState.ATTACKING;
+        }
+
+        private LivingEntity findEntityByUUID(UUID targetId) {
+            // Use server level entity iteration
+            if (unit.level().isClientSide) return null;
+            
+            for (Entity entity : unit.level().getEntitiesOfClass(LivingEntity.class, 
+                    unit.getBoundingBox().inflate(32.0D))) {
+                if (entity.getUUID().equals(targetId)) {
+                    return (LivingEntity) entity;
+                }
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Custom target selector for defending against hostile mobs
+     */
+    private static class DefendTargetGoal extends Goal {
+        private final UnitEntity unit;
+        private LivingEntity hostileTarget;
+
+        public DefendTargetGoal(UnitEntity unit) {
+            this.unit = unit;
+        }
+
+        @Override
+        public boolean canUse() {
+            if (unit.unitData == null) return false;
+            if (unit.unitData.getCurrentState() != NationUnit.UnitState.DEFENDING) return false;
+            
+            // Look for hostile entities around unit's current position (within defend range)
+            Vec3 defendPos = new Vec3(unit.unitData.getDefendX(), unit.unitData.getDefendY(), unit.unitData.getDefendZ());
+            if (defendPos.x == 0 && defendPos.y == 0 && defendPos.z == 0) return false;
+            
+            // Only defend if we're reasonably close to our defend position (within 20 blocks)
+            if (unit.distanceToSqr(defendPos) > 400.0D) return false;
+            
+            // Find hostile entities within 12 blocks of the unit's current position
+            List<LivingEntity> hostileEntities = unit.level().getEntitiesOfClass(LivingEntity.class,
+                unit.getBoundingBox().inflate(12.0D),
+                entity -> {
+                    // Don't target self
+                    if (entity == unit) return false;
+                    
+                    // Target hostile mobs (monsters)
+                    if (entity instanceof net.minecraft.world.entity.monster.Monster) {
+                        return true;
+                    }
+                    // Target players from other nations or players without a nation
+                    if (entity instanceof Player player) {
+                        return !unit.isPlayerFromSameNation(player);
+                    }
+                    // Don't target other units or neutral entities
+                    return false;
+                }
+            );
+            
+            if (!hostileEntities.isEmpty()) {
+                // Find the closest hostile entity to the unit
+                LivingEntity closest = null;
+                double closestDistance = Double.MAX_VALUE;
+                
+                for (LivingEntity entity : hostileEntities) {
+                    double distance = unit.distanceToSqr(entity);
+                    if (distance < closestDistance) {
+                        closest = entity;
+                        closestDistance = distance;
+                    }
+                }
+                
+                if (closest != null) {
+                    this.hostileTarget = closest;
+                    unit.setTarget(closest);
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+
+        @Override
+        public boolean canContinueToUse() {
+            return hostileTarget != null && 
+                   hostileTarget.isAlive() && 
+                   unit.unitData != null && 
+                   unit.unitData.getCurrentState() == NationUnit.UnitState.DEFENDING &&
+                   unit.distanceToSqr(hostileTarget) < 256.0D; // 16 block range
+        }
+
+        @Override
+        public void stop() {
+            this.hostileTarget = null;
+            if (unit.unitData != null && unit.unitData.getCurrentState() == NationUnit.UnitState.DEFENDING) {
+                unit.setTarget(null); // Clear target but stay in defending mode
+            }
+        }
+    }
+
+    /**
      * Custom AI goal to follow nation players
      */
     private static class FollowOwnerNationPlayersGoal extends Goal {
@@ -198,6 +446,11 @@ public class UnitEntity extends PathfinderMob {
 
         @Override
         public boolean canUse() {
+            // Only follow players when in IDLE state
+            if (unit.unitData != null && unit.unitData.getCurrentState() != NationUnit.UnitState.IDLE) {
+                return false;
+            }
+            
             Player closest = unit.level().getNearestPlayer(unit.getX(), unit.getY(), unit.getZ(), startDistance, false);
             if (closest != null && unit.isPlayerFromSameNation(closest)) {
                 this.closestNationPlayer = closest;
@@ -211,7 +464,8 @@ public class UnitEntity extends PathfinderMob {
             return closestNationPlayer != null && 
                    !closestNationPlayer.isRemoved() && 
                    unit.distanceTo(closestNationPlayer) < startDistance &&
-                   unit.isPlayerFromSameNation(closestNationPlayer);
+                   unit.isPlayerFromSameNation(closestNationPlayer) &&
+                   (unit.unitData == null || unit.unitData.getCurrentState() == NationUnit.UnitState.IDLE);
         }
 
         @Override
