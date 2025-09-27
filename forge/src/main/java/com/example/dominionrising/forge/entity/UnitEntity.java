@@ -89,10 +89,10 @@ public class UnitEntity extends PathfinderMob {
         // Update entity attributes based on unit data
         updateAttributesFromUnit();
         
-        // Set custom name
-        this.setCustomName(net.minecraft.network.chat.Component.literal(
-                unit.getType() + " (Lv." + unit.getLevel() + ")"
-        ));
+        // Set custom name with nation information
+        String displayName = "§6[" + unit.getOwnerNation() + "]§r " + 
+                            unit.getType() + " §7(Lv." + unit.getLevel() + ")";
+        this.setCustomName(net.minecraft.network.chat.Component.literal(displayName));
         this.setCustomNameVisible(true);
     }
 
@@ -232,11 +232,14 @@ public class UnitEntity extends PathfinderMob {
 
     /**
      * Custom AI goal to defend specific positions based on unit tactical state
+     * Units stay within 35 blocks of defend position and return to origin when not fighting
      */
     private static class UnitDefendGoal extends Goal {
         private final UnitEntity unit;
         private final double speedModifier;
         private BlockPos defendPosition;
+        private static final double MAX_DEFEND_DISTANCE = 35.0D; // 35 block radius
+        private static final double MAX_DEFEND_DISTANCE_SQ = MAX_DEFEND_DISTANCE * MAX_DEFEND_DISTANCE;
 
         public UnitDefendGoal(UnitEntity unit, double speedModifier) {
             this.unit = unit;
@@ -248,32 +251,60 @@ public class UnitEntity extends PathfinderMob {
             if (unit.unitData == null) return false;
             if (unit.unitData.getCurrentState() != NationUnit.UnitState.DEFENDING) return false;
             
-            // Only try to return to defend position if we're far away AND not currently attacking
-            if (unit.getTarget() != null) return false; // Don't interrupt attacks
-            
-            // Create Vec3 from individual coordinates
+            // Get defend position
             Vec3 defendPos = new Vec3(unit.unitData.getDefendX(), unit.unitData.getDefendY(), unit.unitData.getDefendZ());
-            if (defendPos.x != 0 || defendPos.y != 0 || defendPos.z != 0) {
-                this.defendPosition = BlockPos.containing(defendPos);
-                return unit.distanceToSqr(defendPos) > 16.0D; // Only move if far from position
+            if (defendPos.x == 0 && defendPos.y == 0 && defendPos.z == 0) return false;
+            
+            this.defendPosition = BlockPos.containing(defendPos);
+            double distanceToDefendPos = unit.distanceToSqr(defendPos);
+            
+            // If unit is outside the 35-block radius, force return to defend position
+            if (distanceToDefendPos > MAX_DEFEND_DISTANCE_SQ) {
+                return true; // Force return regardless of combat state
             }
+            
+            // If not fighting and far from defend position, return to it
+            if (unit.getTarget() == null && distanceToDefendPos > 16.0D) {
+                return true;
+            }
+            
             return false;
         }
 
         @Override
         public boolean canContinueToUse() {
-            // Stop if we have a target to attack or if we're close enough
-            if (unit.getTarget() != null) return false;
+            if (unit.unitData == null || unit.unitData.getCurrentState() != NationUnit.UnitState.DEFENDING) {
+                return false;
+            }
             
-            return defendPosition != null && 
-                   unit.unitData != null && 
-                   unit.unitData.getCurrentState() == NationUnit.UnitState.DEFENDING &&
-                   unit.distanceToSqr(Vec3.atCenterOf(defendPosition)) > 4.0D;
+            if (defendPosition == null) return false;
+            
+            Vec3 defendPos = Vec3.atCenterOf(defendPosition);
+            double distanceToDefendPos = unit.distanceToSqr(defendPos);
+            
+            // Always continue if outside max range (priority override)
+            if (distanceToDefendPos > MAX_DEFEND_DISTANCE_SQ) {
+                return true;
+            }
+            
+            // If we have a target but are too far from defend position, return to defend position
+            if (unit.getTarget() != null && distanceToDefendPos > MAX_DEFEND_DISTANCE_SQ) {
+                unit.setTarget(null); // Drop target and return
+                return true;
+            }
+            
+            // Continue returning to position if no target and still far away
+            return unit.getTarget() == null && distanceToDefendPos > 4.0D;
         }
 
         @Override
         public void start() {
             if (defendPosition != null) {
+                // Cancel any current attack to return to position if outside bounds
+                Vec3 defendPos = Vec3.atCenterOf(defendPosition);
+                if (unit.distanceToSqr(defendPos) > MAX_DEFEND_DISTANCE_SQ) {
+                    unit.setTarget(null);
+                }
                 unit.getNavigation().moveTo(defendPosition.getX(), defendPosition.getY(), defendPosition.getZ(), speedModifier);
             }
         }
@@ -285,9 +316,20 @@ public class UnitEntity extends PathfinderMob {
 
         @Override
         public void tick() {
-            // Only keep moving to position if we don't have a target and we're still far away
-            if (unit.getTarget() == null && defendPosition != null && 
-                unit.distanceToSqr(Vec3.atCenterOf(defendPosition)) > 4.0D) {
+            if (defendPosition == null) return;
+            
+            Vec3 defendPos = Vec3.atCenterOf(defendPosition);
+            double distanceToDefendPos = unit.distanceToSqr(defendPos);
+            
+            // Priority: Return to defend position if outside max range
+            if (distanceToDefendPos > MAX_DEFEND_DISTANCE_SQ) {
+                unit.setTarget(null); // Drop any target
+                unit.getNavigation().moveTo(defendPosition.getX(), defendPosition.getY(), defendPosition.getZ(), speedModifier);
+                return;
+            }
+            
+            // Normal behavior: return to position when not fighting and far away
+            if (unit.getTarget() == null && distanceToDefendPos > 4.0D) {
                 unit.getNavigation().moveTo(defendPosition.getX(), defendPosition.getY(), defendPosition.getZ(), speedModifier);
             }
         }
@@ -363,15 +405,22 @@ public class UnitEntity extends PathfinderMob {
             Vec3 defendPos = new Vec3(unit.unitData.getDefendX(), unit.unitData.getDefendY(), unit.unitData.getDefendZ());
             if (defendPos.x == 0 && defendPos.y == 0 && defendPos.z == 0) return false;
             
-            // Only defend if we're reasonably close to our defend position (within 20 blocks)
-            if (unit.distanceToSqr(defendPos) > 400.0D) return false;
+            // Only defend if we're within the 35-block defend boundary
+            double maxDefendDistanceSq = 35.0D * 35.0D;
+            if (unit.distanceToSqr(defendPos) > maxDefendDistanceSq) return false;
             
             // Find hostile entities within 12 blocks of the unit's current position
+            // But also ensure they're within the 35-block defend boundary
             List<LivingEntity> hostileEntities = unit.level().getEntitiesOfClass(LivingEntity.class,
                 unit.getBoundingBox().inflate(12.0D),
                 entity -> {
                     // Don't target self
                     if (entity == unit) return false;
+                    
+                    // Only target entities within the defend boundary (35 blocks from defend position)
+                    if (entity.distanceToSqr(defendPos) > maxDefendDistanceSq) {
+                        return false;
+                    }
                     
                     // Target hostile mobs (monsters)
                     if (entity instanceof net.minecraft.world.entity.monster.Monster) {
@@ -411,11 +460,21 @@ public class UnitEntity extends PathfinderMob {
 
         @Override
         public boolean canContinueToUse() {
-            return hostileTarget != null && 
-                   hostileTarget.isAlive() && 
-                   unit.unitData != null && 
-                   unit.unitData.getCurrentState() == NationUnit.UnitState.DEFENDING &&
-                   unit.distanceToSqr(hostileTarget) < 256.0D; // 16 block range
+            if (hostileTarget == null || !hostileTarget.isAlive()) return false;
+            if (unit.unitData == null || unit.unitData.getCurrentState() != NationUnit.UnitState.DEFENDING) return false;
+            
+            // Check if we're still within the 35-block defend boundary
+            Vec3 defendPos = new Vec3(unit.unitData.getDefendX(), unit.unitData.getDefendY(), unit.unitData.getDefendZ());
+            double maxDefendDistanceSq = 35.0D * 35.0D;
+            
+            // Stop targeting if either the unit or the target moved outside the defend boundary
+            if (unit.distanceToSqr(defendPos) > maxDefendDistanceSq || 
+                hostileTarget.distanceToSqr(defendPos) > maxDefendDistanceSq) {
+                return false;
+            }
+            
+            // Continue if target is within combat range
+            return unit.distanceToSqr(hostileTarget) < 256.0D; // 16 block range
         }
 
         @Override

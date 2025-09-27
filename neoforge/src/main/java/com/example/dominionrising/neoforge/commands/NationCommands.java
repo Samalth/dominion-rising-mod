@@ -2,6 +2,7 @@ package com.example.dominionrising.neoforge.commands;
 
 import com.example.dominionrising.common.nation.Nation;
 import com.example.dominionrising.common.nation.NationManager;
+import com.example.dominionrising.common.nation.NationRole;
 import com.example.dominionrising.common.unit.NationUnit;
 import com.example.dominionrising.common.unit.UnitManager;
 import com.example.dominionrising.neoforge.entity.UnitEntity;
@@ -13,6 +14,9 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+
+import java.util.List;
+import java.util.UUID;
 
 import java.util.List;
 
@@ -341,5 +345,134 @@ public class NationCommands {
         }
         
         return 1;
+    }
+    
+    private static int listMembers(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        
+        if (!(source.getEntity() instanceof ServerPlayer player)) {
+            source.sendFailure(Component.literal("This command can only be used by players"));
+            return 0;
+        }
+
+        NationManager manager = NationManager.getInstance();
+        Nation playerNation = manager.getPlayerNation(player.getUUID());
+        
+        if (playerNation == null) {
+            source.sendFailure(Component.literal("You are not in a nation"));
+            return 0;
+        }
+
+        source.sendSuccess(() -> Component.literal("§6=== " + playerNation.getName() + " Members ==="), false);
+        
+        // Get leader info
+        UUID leaderId = playerNation.getLeader();
+        String leaderName = getPlayerNameFromUUID(source, leaderId);
+        source.sendSuccess(() -> Component.literal("§e★ Leader: §f" + leaderName), false);
+        
+        // Get other members
+        List<UUID> members = playerNation.getMembers();
+        if (members.size() > 1) {
+            source.sendSuccess(() -> Component.literal("§7Members:"), false);
+            for (UUID memberId : members) {
+                if (!memberId.equals(leaderId)) {
+                    String memberName = getPlayerNameFromUUID(source, memberId);
+                    String role = playerNation.getMemberRole(memberId).name();
+                    source.sendSuccess(() -> Component.literal("§7• §f" + memberName + " §8(" + role + ")"), false);
+                }
+            }
+        }
+        
+        // Show unit count
+        UnitManager unitManager = UnitManager.getInstance();
+        List<NationUnit> units = unitManager.listUnits(playerNation);
+        source.sendSuccess(() -> Component.literal("§7Units: §f" + units.size()), false);
+        
+        return 1;
+    }
+    
+    private static int invitePlayer(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        
+        if (!(source.getEntity() instanceof ServerPlayer player)) {
+            source.sendFailure(Component.literal("This command can only be used by players"));
+            return 0;
+        }
+
+        String targetPlayerName = StringArgumentType.getString(context, "player");
+        ServerPlayer targetPlayer = source.getServer().getPlayerList().getPlayerByName(targetPlayerName);
+        
+        if (targetPlayer == null) {
+            source.sendFailure(Component.literal("Player '" + targetPlayerName + "' not found"));
+            return 0;
+        }
+
+        NationManager manager = NationManager.getInstance();
+        Nation playerNation = manager.getPlayerNation(player.getUUID());
+        
+        if (playerNation == null) {
+            source.sendFailure(Component.literal("You are not in a nation"));
+            return 0;
+        }
+        
+        // Check if player has permission to invite (leader or commander)
+        NationRole playerRole = playerNation.getMemberRole(player.getUUID());
+        if (playerRole != NationRole.LEADER && playerRole != NationRole.COMMANDER) {
+            source.sendFailure(Component.literal("You don't have permission to invite players"));
+            return 0;
+        }
+        
+        // Check if target is already in a nation
+        if (manager.getPlayerNation(targetPlayer.getUUID()) != null) {
+            source.sendFailure(Component.literal(targetPlayerName + " is already in a nation"));
+            return 0;
+        }
+        
+        // Send invite (for now, just auto-join - could implement invite system later)
+        NationManager.NationResult result = manager.joinNation(playerNation.getName(), targetPlayer.getUUID());
+        
+        if (result.isSuccess()) {
+            source.sendSuccess(() -> Component.literal("Successfully added " + targetPlayerName + " to " + playerNation.getName()), false);
+            // Notify the target player
+            targetPlayer.sendSystemMessage(Component.literal("§6You have been added to nation '" + playerNation.getName() + "'"));
+            return 1;
+        } else {
+            source.sendFailure(Component.literal(result.getMessage()));
+            return 0;
+        }
+    }
+    
+    private static int acceptInvite(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        
+        if (!(source.getEntity() instanceof ServerPlayer player)) {
+            source.sendFailure(Component.literal("This command can only be used by players"));
+            return 0;
+        }
+
+        String nationName = StringArgumentType.getString(context, "nation");
+        NationManager manager = NationManager.getInstance();
+        
+        // For now, this just joins the nation directly
+        NationManager.NationResult result = manager.joinNation(nationName, player.getUUID());
+        
+        if (result.isSuccess()) {
+            source.sendSuccess(() -> Component.literal(result.getMessage()), false);
+            return 1;
+        } else {
+            source.sendFailure(Component.literal(result.getMessage()));
+            return 0;
+        }
+    }
+    
+    /**
+     * Helper method to get player name from UUID
+     */
+    private static String getPlayerNameFromUUID(CommandSourceStack source, UUID playerId) {
+        ServerPlayer player = source.getServer().getPlayerList().getPlayer(playerId);
+        if (player != null) {
+            return player.getName().getString();
+        }
+        return "Unknown Player";
     }
 }
