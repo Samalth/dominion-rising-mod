@@ -1,0 +1,10 @@
+# Placeholder texture file for Nation Unit
+# This should be replaced with an actual PNG texture file
+# For now, the entity will use the default Villager texture from Minecraft
+# 
+# To replace this:
+# 1. Create a 64x64 PNG texture file
+# 2. Replace this file with unit.png
+# 3. The texture will be used by both Forge and NeoForge versions
+#
+# Current fallback: Uses Minecraft's default Villager texture

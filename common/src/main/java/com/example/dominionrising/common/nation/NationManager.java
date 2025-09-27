@@ -300,6 +300,8 @@ public class NationManager {
                "§e/nation promote <player>§f - Promote a member (leaders only)\n" +
                "§e/nation demote <player>§f - Demote a member (leaders only)\n" +
                "§e/nation kick <player>§f - Kick a member (leaders only)\n" +
+               "§a/nation spawnunit <type>§f - Spawn a unit (soldier/archer/knight/mage)\n" +
+               "§a/nation listunits§f - List all your nation's units\n" +
                "§e/nation help§f - Show this help message\n" +
                "§7Roles: Leader > Commander > Citizen";
     }
@@ -369,6 +371,18 @@ public class NationManager {
         return new HashMap<>(playerToNation);
     }
     
+    /**
+     * Get a nation by its name
+     * @param nationName The name of the nation
+     * @return The nation, or null if not found
+     */
+    public Nation getNationByName(String nationName) {
+        if (nationName == null) {
+            return null;
+        }
+        return nations.get(nationName.toLowerCase());
+    }
+
     /**
      * Result class for nation operations
      */

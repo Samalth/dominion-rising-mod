@@ -1,0 +1,7 @@
+{
+  "comment": "Placeholder model - uses Villager model temporarily",
+  "parent": "minecraft:entity/villager/villager",
+  "textures": {
+    "layer0": "dominionrising:entity/unit"
+  }
+}

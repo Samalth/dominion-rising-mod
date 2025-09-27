@@ -1,6 +1,11 @@
 package com.example.dominionrising.neoforge.commands;
 
+import com.example.dominionrising.common.nation.Nation;
 import com.example.dominionrising.common.nation.NationManager;
+import com.example.dominionrising.common.unit.NationUnit;
+import com.example.dominionrising.common.unit.UnitManager;
+import com.example.dominionrising.neoforge.entity.UnitEntity;
+import com.example.dominionrising.neoforge.registry.ModEntities;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
@@ -8,6 +13,8 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+
+import java.util.List;
 
 /**
  * Handles nation-related commands for NeoForge
@@ -37,6 +44,11 @@ public class NationCommands {
                 .then(Commands.literal("kick")
                         .then(Commands.argument("player", StringArgumentType.word())
                                 .executes(NationCommands::kickPlayer)))
+                .then(Commands.literal("spawnunit")
+                        .then(Commands.argument("type", StringArgumentType.word())
+                                .executes(NationCommands::spawnUnit)))
+                .then(Commands.literal("listunits")
+                        .executes(NationCommands::listUnits))
                 .then(Commands.literal("help")
                         .executes(NationCommands::showHelp)));
     }
@@ -246,5 +258,88 @@ public class NationCommands {
             source.sendFailure(Component.literal(result.getMessage()));
             return 0;
         }
+    }
+    
+    private static int spawnUnit(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        
+        if (!(source.getEntity() instanceof ServerPlayer player)) {
+            source.sendFailure(Component.literal("This command can only be used by players"));
+            return 0;
+        }
+        
+        String unitType = StringArgumentType.getString(context, "type");
+        
+        NationManager nationManager = NationManager.getInstance();
+        Nation playerNation = nationManager.getPlayerNation(player.getUUID());
+        
+        if (playerNation == null) {
+            source.sendFailure(Component.literal("You must be in a nation to spawn units"));
+            return 0;
+        }
+        
+        UnitManager unitManager = UnitManager.getInstance();
+        
+        if (!unitManager.isValidUnitType(unitType)) {
+            source.sendFailure(Component.literal("Invalid unit type. Available types: " + 
+                String.join(", ", unitManager.getAvailableUnitTypes())));
+            return 0;
+        }
+        
+        // Create the unit data
+        NationUnit unit = unitManager.spawnUnit(unitType, playerNation);
+        if (unit == null) {
+            source.sendFailure(Component.literal("Failed to create unit"));
+            return 0;
+        }
+        
+        // Spawn the entity in the world
+        UnitEntity unitEntity = new UnitEntity(ModEntities.NATION_UNIT.get(), player.level());
+        unitEntity.initializeUnit(unit);
+        unitEntity.setPos(player.getX(), player.getY(), player.getZ());
+        
+        if (player.level().addFreshEntity(unitEntity)) {
+            source.sendSuccess(() -> Component.literal("Spawned " + unitType + " unit for " + playerNation.getName()), false);
+            return 1;
+        } else {
+            // Remove from unit manager if entity spawn failed
+            unitManager.removeUnit(unit.getId());
+            source.sendFailure(Component.literal("Failed to spawn unit entity"));
+            return 0;
+        }
+    }
+    
+    private static int listUnits(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        
+        if (!(source.getEntity() instanceof ServerPlayer player)) {
+            source.sendFailure(Component.literal("This command can only be used by players"));
+            return 0;
+        }
+        
+        NationManager nationManager = NationManager.getInstance();
+        Nation playerNation = nationManager.getPlayerNation(player.getUUID());
+        
+        if (playerNation == null) {
+            source.sendFailure(Component.literal("You must be in a nation to list units"));
+            return 0;
+        }
+        
+        UnitManager unitManager = UnitManager.getInstance();
+        List<NationUnit> units = unitManager.listUnits(playerNation);
+        
+        if (units.isEmpty()) {
+            source.sendSuccess(() -> Component.literal("Your nation has no units"), false);
+            return 1;
+        }
+        
+        source.sendSuccess(() -> Component.literal("=== " + playerNation.getName() + " Units ==="), false);
+        for (NationUnit unit : units) {
+            String unitInfo = String.format("%s (Lv.%d) - %d/%d HP", 
+                unit.getType(), unit.getLevel(), unit.getHealth(), unit.getMaxHealth());
+            source.sendSuccess(() -> Component.literal("• " + unitInfo), false);
+        }
+        
+        return 1;
     }
 }
