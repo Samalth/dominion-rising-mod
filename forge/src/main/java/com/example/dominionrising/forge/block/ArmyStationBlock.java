@@ -70,17 +70,35 @@ public class ArmyStationBlock extends BaseEntityBlock {
             blockEntity.updateNation(serverPlayer.getUUID());
             blockEntity.setChanged();
             
-            // Show unit list in chat (simple implementation)
-            showUnitList(serverPlayer);
+            // Store unit data in registry for client access
+            var units = blockEntity.getCachedUnits();
+            List<com.example.dominionrising.common.gui.ArmyUnitInfo> unitInfos = new java.util.ArrayList<>();
+            for (var unit : units) {
+                unitInfos.add(new com.example.dominionrising.common.gui.ArmyUnitInfo(
+                    unit.getType(), unit.getLevel(), unit.getHealth(), unit.getId()
+                ));
+            }
+            com.example.dominionrising.forge.gui.ArmyStationDataRegistry.storePlayerUnits(serverPlayer.getUUID(), unitInfos);
+            
+            // Open the GUI menu
+            serverPlayer.openMenu(blockEntity);
+            
+            // Send unit data to client (simplified approach)
+            sendUnitDataToClient(serverPlayer);
         }
         
         return InteractionResult.SUCCESS;
     }
     
-    private void showUnitList(ServerPlayer player) {
+    private void sendUnitDataToClient(ServerPlayer player) {
+        // Data is now cached in the BlockEntity and accessed directly by the GUI
+        // Show fallback in chat as backup
         List<NationUnit> units = ArmyStationManager.getPlayerNationUnits(player.getUUID());
-        
-        player.sendSystemMessage(Component.literal("§6=== Army Station - Unit List ==="));
+        showUnitListInChat(player, units);
+    }
+    
+    private void showUnitListInChat(ServerPlayer player, List<NationUnit> units) {
+        player.sendSystemMessage(Component.literal("§6=== Army Station - Unit List (Fallback) ==="));
         
         if (units.isEmpty()) {
             player.sendSystemMessage(Component.literal("§7No units found for your nation."));
@@ -91,6 +109,6 @@ public class ArmyStationBlock extends BaseEntityBlock {
             }
         }
         
-        player.sendSystemMessage(Component.literal("§6========================"));
+        player.sendSystemMessage(Component.literal("§6================================"));
     }
 }

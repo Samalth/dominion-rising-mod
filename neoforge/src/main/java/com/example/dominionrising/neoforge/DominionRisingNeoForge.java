@@ -26,6 +26,7 @@ public class DominionRisingNeoForge {
         // Register mod registries
         ModEntities.register(modEventBus);
         ModBlocks.register(modEventBus);
+        com.example.dominionrising.neoforge.registry.ModMenuTypes.register(modEventBus);
         
         // Register event listeners
         NeoForge.EVENT_BUS.register(this);

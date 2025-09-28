@@ -27,6 +27,7 @@ public class DominionRisingForge {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         ModEntities.register(modEventBus);
         ModBlocks.register(modEventBus);
+        com.example.dominionrising.forge.registry.ModMenuTypes.register(modEventBus);
         
         // Register event listeners
         MinecraftForge.EVENT_BUS.register(this);
