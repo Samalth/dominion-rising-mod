@@ -1,3 +1,5 @@
 {
-    "itemGroup.dominionrising": "Dominion Rising"
+    "itemGroup.dominionrising": "Dominion Rising",
+    "block.dominionrising.army_station": "Army Station",
+    "item.dominionrising.army_station": "Army Station"
 }

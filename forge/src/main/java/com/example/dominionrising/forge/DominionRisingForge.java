@@ -3,6 +3,7 @@ package com.example.dominionrising.forge;
 import com.example.dominionrising.DominionRising;
 import com.example.dominionrising.forge.commands.NationCommands;
 import com.example.dominionrising.forge.commands.UnitCommands;
+import com.example.dominionrising.forge.registry.ModBlocks;
 import com.example.dominionrising.forge.registry.ModEntities;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterCommandsEvent;
@@ -25,6 +26,7 @@ public class DominionRisingForge {
         @SuppressWarnings("removal")
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         ModEntities.register(modEventBus);
+        ModBlocks.register(modEventBus);
         
         // Register event listeners
         MinecraftForge.EVENT_BUS.register(this);
@@ -34,5 +36,6 @@ public class DominionRisingForge {
     public void onRegisterCommands(RegisterCommandsEvent event) {
         NationCommands.register(event.getDispatcher());
         UnitCommands.register(event.getDispatcher());
+        com.example.dominionrising.forge.commands.ArmyStationCommands.register(event.getDispatcher());
     }
 }

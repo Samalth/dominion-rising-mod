@@ -1,8 +1,10 @@
 package com.example.dominionrising.neoforge;
 
 import com.example.dominionrising.DominionRising;
+import com.example.dominionrising.neoforge.commands.ArmyStationCommands;
 import com.example.dominionrising.neoforge.commands.NationCommands;
 import com.example.dominionrising.neoforge.commands.UnitCommands;
+import com.example.dominionrising.neoforge.registry.ModBlocks;
 import com.example.dominionrising.neoforge.registry.ModEntities;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -23,6 +25,7 @@ public class DominionRisingNeoForge {
         
         // Register mod registries
         ModEntities.register(modEventBus);
+        ModBlocks.register(modEventBus);
         
         // Register event listeners
         NeoForge.EVENT_BUS.register(this);
@@ -32,5 +35,6 @@ public class DominionRisingNeoForge {
     public void onRegisterCommands(RegisterCommandsEvent event) {
         NationCommands.register(event.getDispatcher());
         UnitCommands.register(event.getDispatcher());
+        ArmyStationCommands.register(event.getDispatcher());
     }
 }
