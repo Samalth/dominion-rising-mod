@@ -32,6 +32,9 @@ public class ArmyStationScreen extends AbstractContainerScreen<ArmyStationMenu> 
     // GROUP tab components
     private Button groupSelectedButton;
     private Map<UUID, EditBox> unitCountFields = new HashMap<>();
+    private Map<String, EditBox> groupedUnitFields = new HashMap<>();
+    private Map<String, Integer> unitTypeAvailable = new HashMap<>();
+    private Map<String, List<ArmyUnitInfo>> groupedUnits = new HashMap<>();
     private static final int TAB_BUTTON_WIDTH = 60;
     private static final int TAB_BUTTON_HEIGHT = 20;
     
@@ -88,28 +91,71 @@ public class ArmyStationScreen extends AbstractContainerScreen<ArmyStationMenu> 
         for (EditBox field : unitCountFields.values()) {
             field.setVisible(currentTab == ArmyStationTab.GROUP);
         }
+        
+        // Update GROUP components when switching to GROUP tab
+        if (currentTab == ArmyStationTab.GROUP && dataLoaded) {
+            updateGroupComponents();
+        }
     }
     
     private void updateGroupComponents() {
-        // Clear existing text fields
-        unitCountFields.values().forEach(this::removeWidget);
-        unitCountFields.clear();
-        
         if (currentTab == ArmyStationTab.GROUP && dataLoaded) {
+            // Save current field values before clearing
+            Map<String, String> savedValues = new HashMap<>();
+            for (Map.Entry<String, EditBox> entry : groupedUnitFields.entrySet()) {
+                savedValues.put(entry.getKey(), entry.getValue().getValue());
+            }
+            
+            // Clear existing text fields
+            unitCountFields.values().forEach(this::removeWidget);
+            unitCountFields.clear();
+            groupedUnitFields.values().forEach(this::removeWidget);
+            groupedUnitFields.clear();
+            
+            // Clear grouping data
+            unitTypeAvailable.clear();
+            groupedUnits.clear();
+            
+            // Group units by type + level
+            for (ArmyUnitInfo unit : unitInfos) {
+                String key = unit.getType() + "_" + unit.getLevel();
+                groupedUnits.computeIfAbsent(key, k -> new ArrayList<>()).add(unit);
+                unitTypeAvailable.put(key, unitTypeAvailable.getOrDefault(key, 0) + 1);
+            }
+            
+            // Create text fields for grouped units
             int yOffset = 40;
-            for (int i = 0; i < unitInfos.size() && i < 8; i++) {
-                ArmyUnitInfo unit = unitInfos.get(i);
+            int index = 0;
+            for (Map.Entry<String, List<ArmyUnitInfo>> entry : groupedUnits.entrySet()) {
+                if (index >= 8) break; // Limit display
+                
+                String key = entry.getKey();
                 
                 // Create text field for unit count
                 EditBox countField = new EditBox(font, leftPos + 120, topPos + yOffset, 30, 12, Component.literal("Count"));
-                countField.setValue("0");
+                
+                // Restore previous value if it existed, otherwise use "0"
+                String previousValue = savedValues.getOrDefault(key, "0");
+                countField.setValue(previousValue);
                 countField.setMaxLength(3);
                 countField.setVisible(currentTab == ArmyStationTab.GROUP);
                 
-                unitCountFields.put(unit.getId(), countField);
+                // Prevent auto-reset by removing validation that causes focus loss
+                countField.setFilter(text -> {
+                    if (text.isEmpty()) return true;
+                    try {
+                        int value = Integer.parseInt(text);
+                        return value >= 0 && value <= 999;
+                    } catch (NumberFormatException e) {
+                        return false;
+                    }
+                });
+                
+                groupedUnitFields.put(key, countField);
                 addRenderableWidget(countField);
                 
                 yOffset += 15;
+                index++;
             }
         }
     }
@@ -117,14 +163,22 @@ public class ArmyStationScreen extends AbstractContainerScreen<ArmyStationMenu> 
     private void sendGroupUnitsPacket() {
         Map<UUID, Integer> unitCounts = new HashMap<>();
         
-        for (Map.Entry<UUID, EditBox> entry : unitCountFields.entrySet()) {
+        for (Map.Entry<String, EditBox> entry : groupedUnitFields.entrySet()) {
+            String unitKey = entry.getKey();
             try {
-                int count = Integer.parseInt(entry.getValue().getValue());
-                if (count > 0) {
-                    unitCounts.put(entry.getKey(), count);
+                int requestedCount = Integer.parseInt(entry.getValue().getValue());
+                if (requestedCount > 0) {
+                    List<ArmyUnitInfo> availableUnits = groupedUnits.get(unitKey);
+                    if (availableUnits != null) {
+                        // Add up to the requested count of this unit type
+                        int actualCount = Math.min(requestedCount, availableUnits.size());
+                        for (int i = 0; i < actualCount; i++) {
+                            unitCounts.put(availableUnits.get(i).getId(), 1);
+                        }
+                    }
                 }
             } catch (NumberFormatException e) {
-                // Invalid number, skip this unit
+                // Invalid number, skip this unit type
             }
         }
         
@@ -138,11 +192,17 @@ public class ArmyStationScreen extends AbstractContainerScreen<ArmyStationMenu> 
     private void loadUnitData() {
         try {
             // Get unit data from registry instead of BlockEntity
-            this.unitInfos = com.example.dominionrising.neoforge.gui.ArmyStationDataRegistry.getPlayerUnits(this.minecraft.player.getUUID());
-            this.dataLoaded = !this.unitInfos.isEmpty();
+            List<ArmyUnitInfo> newUnitInfos = com.example.dominionrising.neoforge.gui.ArmyStationDataRegistry.getPlayerUnits(this.minecraft.player.getUUID());
+            boolean newDataLoaded = !newUnitInfos.isEmpty();
             
-            // Update GROUP tab components when data changes
-            if (dataLoaded) {
+            // Check if the data size changed (simple but effective way to detect changes)
+            boolean dataChanged = this.unitInfos.size() != newUnitInfos.size() || this.dataLoaded != newDataLoaded;
+            
+            this.unitInfos = newUnitInfos;
+            this.dataLoaded = newDataLoaded;
+            
+            // Update GROUP tab components only when data changes and we're on GROUP tab
+            if (dataChanged && dataLoaded && currentTab == ArmyStationTab.GROUP) {
                 updateGroupComponents();
             }
         } catch (Exception e) {
@@ -213,28 +273,33 @@ public class ArmyStationScreen extends AbstractContainerScreen<ArmyStationMenu> 
     }
     
     private void renderGroupTab(GuiGraphics graphics) {
-        if (!unitInfos.isEmpty()) {
+        if (!groupedUnits.isEmpty()) {
             graphics.drawString(this.font, "Select units to group:", 8, 25, 4210752, false);
             
             int y = 40;
-            int maxLines = 8; // Limit display to prevent overflow
-            int count = Math.min(unitInfos.size(), maxLines);
+            int index = 0;
             
-            for (int i = 0; i < count; i++) {
-                ArmyUnitInfo unit = unitInfos.get(i);
+            for (Map.Entry<String, List<ArmyUnitInfo>> entry : groupedUnits.entrySet()) {
+                if (index >= 8) break; // Limit display
+                
+                String key = entry.getKey();
+                List<ArmyUnitInfo> units = entry.getValue();
+                ArmyUnitInfo firstUnit = units.get(0); // Get info from first unit
+                int available = units.size();
                 
                 // Unit info text
-                String unitText = unit.getType() + " | Lv " + unit.getLevel();
+                String unitText = firstUnit.getType() + " | Lv " + firstUnit.getLevel();
                 graphics.drawString(this.font, unitText, 8, y, 0xFFFFFF, false);
                 
-                // Available count
-                graphics.drawString(this.font, "{available}", 155, y, 0x888888, false);
+                // Available count - show actual number
+                graphics.drawString(this.font, "(" + available + " available)", 155, y, 0x888888, false);
                 
                 y += 15;
+                index++;
             }
             
-            if (unitInfos.size() > maxLines) {
-                graphics.drawString(this.font, "... and " + (unitInfos.size() - maxLines) + " more units", 8, y, 0x888888, false);
+            if (groupedUnits.size() > 8) {
+                graphics.drawString(this.font, "... and " + (groupedUnits.size() - 8) + " more unit types", 8, y, 0x888888, false);
             }
         } else {
             graphics.drawString(this.font, "No units available for grouping", 8, 25, 0x888888, false);
